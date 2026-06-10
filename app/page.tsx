@@ -70,78 +70,133 @@ export default async function LandingPage() {
   const image = product?.imageUrl ?? "/meal-plan-cover.png"
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-[#FAFAF8]">
       <SiteNavbar />
 
       <main className="flex-1">
-        {/* Hero */}
-        <section className="relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-accent/40 via-background to-background" />
-          <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:py-20">
+
+        <section className="relative overflow-hidden bg-[#FAFAF8]">
+          {/* Warm ambient blobs */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-32 -right-32 h-[540px] w-[540px] rounded-full opacity-30"
+            style={{
+              background:
+                "radial-gradient(circle, #F4A05A 0%, #F4A05A00 70%)",
+              filter: "blur(80px)",
+            }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-20 -left-20 h-[360px] w-[360px] rounded-full opacity-20"
+            style={{
+              background:
+                "radial-gradient(circle, #EFD9AE 0%, #EFD9AE00 70%)",
+              filter: "blur(60px)",
+            }}
+          />
+
+          <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-14 sm:px-8 lg:grid-cols-2 lg:py-24">
+            {/* Left */}
             <div className="order-2 lg:order-1">
-              <Badge variant="secondary" className="mb-4 gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
+              {/* Eyebrow badge */}
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#F0D9B5] bg-[#FEF9F0] px-3.5 py-1.5 text-xs font-semibold tracking-wide text-[#C17B2F] shadow-sm">
+                <Sparkles className="h-3.5 w-3.5" />
                 Digital meal plan
-              </Badge>
-              <h1 className="font-heading text-pretty text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
+              </div>
+
+              <h1
+                className="font-heading text-pretty text-[2.6rem] font-bold leading-[1.1] tracking-tight text-[#1A1510] sm:text-5xl lg:text-[3.2rem]"
+                style={{ letterSpacing: "-0.03em" }}
+              >
                 {title}
               </h1>
-              <div className="mt-4 flex items-center gap-3">
-                <Avatar className="h-9 w-9 border border-border">
-                  <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+
+              {/* Author */}
+              <div className="mt-5 flex items-center gap-3">
+                <Avatar className="h-10 w-10 ring-2 ring-[#F0D9B5] ring-offset-1 ring-offset-[#FAFAF8]">
+                  <AvatarFallback className="bg-[#F4A05A]/20 text-sm font-bold text-[#C17B2F]">
                     TO
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Temitayo Oyebanjo</p>
-                  <p className="text-xs text-muted-foreground">Creator &amp; home-cook coach</p>
+                  <p className="text-sm font-semibold text-[#1A1510]">Temitayo Oyebanjo</p>
+                  <p className="text-xs text-[#7A6A55]">Creator &amp; home-cook coach</p>
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+              {/* Stars + price */}
+              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
                 <div className="flex items-center gap-2">
                   <StarRating rating={4.7} />
-                  <span className="text-sm font-medium text-foreground">4.7</span>
-                  <span className="text-sm text-muted-foreground">(34 reviews)</span>
+                  <span className="text-sm font-semibold text-[#1A1510]">4.7</span>
+                  <span className="text-sm text-[#9A8A76]">(34 reviews)</span>
                 </div>
-                <span className="h-4 w-px bg-border" />
-                <span className="text-2xl font-semibold text-foreground">{price}</span>
+                <span className="h-4 w-px bg-[#E2D5C3]" />
+                <span className="text-2xl font-bold tracking-tight text-[#1A1510]">{price}</span>
               </div>
 
-              <p className="mt-5 max-w-md text-pretty leading-relaxed text-muted-foreground">
+              {/* Body copy */}
+              <p className="mt-5 max-w-md text-pretty text-[1.05rem] leading-[1.75] text-[#5C5043]">
                 Tired of guessing what to eat every day? This simple, student-friendly meal plan
                 shows you exactly what to cook, how to stretch your budget, and still enjoy every
                 bite.
               </p>
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <Button asChild size="lg" className="h-12 gap-2 rounded-xl px-7 text-base shadow-lg shadow-primary/20">
-                  <Link href="/checkout">
+              {/* CTAs */}
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Button
+
+                  size="lg"
+                  className="h-13 gap-2 rounded-2xl px-8 text-[0.95rem] font-semibold shadow-[0_8px_28px_rgba(196,120,40,0.28)] transition-all duration-200 hover:shadow-[0_12px_36px_rgba(196,120,40,0.38)] hover:-translate-y-0.5"
+                  style={{
+                    background: "linear-gradient(135deg,#E8922A 0%,#C97120 100%)",
+                    color: "#fff",
+                    border: "none",
+                  }}
+                >
+                  <Link className="flex items-center gap-2" href="/checkout">
                     Buy Access
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="h-12 rounded-xl px-7 text-base">
+                <Button
+
+                  size="lg"
+                  variant="outline"
+                  className="h-13 rounded-2xl border-[#E2D5C3] bg-white px-8 text-[0.95rem] font-semibold text-[#5C5043] hover:bg-[#FEF9F0] hover:border-[#D4B896]"
+                >
                   <Link href="#what-you-get">See what&apos;s inside</Link>
                 </Button>
               </div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+              {/* Trust pills */}
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2.5 text-sm text-[#7A6A55]">
                 <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-success" />
+                  <ShieldCheck className="h-4 w-4 text-emerald-500" />
                   Email-verified access
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-primary" />
+                  <Clock className="h-4 w-4 text-[#C17B2F]" />
                   Instant delivery
                 </span>
               </div>
             </div>
 
+            {/* Right — product image */}
             <div className="order-1 lg:order-2">
               <div className="relative mx-auto max-w-md">
-                <div className="absolute -inset-3 rounded-[2rem] bg-primary/10 blur-2xl" />
-                <div className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-2xl shadow-primary/10">
+                {/* Glow ring */}
+                <div
+                  aria-hidden
+                  className="absolute -inset-4 rounded-[2.5rem] opacity-60"
+                  style={{
+                    background:
+                      "radial-gradient(circle, #F4A05A55 0%, transparent 70%)",
+                    filter: "blur(24px)",
+                  }}
+                />
+                <div className="relative overflow-hidden rounded-[2rem] border border-[#EAD9C4] bg-white shadow-[0_24px_60px_rgba(90,55,20,0.14)]">
                   <Image
                     src={image || "/placeholder.svg"}
                     alt={`${title} cover`}
@@ -150,12 +205,15 @@ export default async function LandingPage() {
                     priority
                     className="aspect-square w-full object-cover"
                   />
-                  <div className="flex items-center justify-between gap-3 border-t border-border bg-card px-5 py-4">
+                  {/* Card footer */}
+                  <div className="flex items-center justify-between gap-3 border-t border-[#EAD9C4] bg-white px-5 py-4">
                     <div className="flex items-center gap-2">
-                      <BadgeCheck className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium text-foreground">Verified creator product</span>
+                      <BadgeCheck className="h-5 w-5 text-[#C17B2F]" />
+                      <span className="text-sm font-semibold text-[#1A1510]">Verified creator product</span>
                     </div>
-                    <span className="text-sm font-semibold text-foreground">{price}</span>
+                    <span className="rounded-full bg-[#FEF3E2] px-3 py-0.5 text-sm font-bold text-[#C17B2F]">
+                      {price}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -163,13 +221,16 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* Description */}
-        <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-          <div className="rounded-3xl border border-border bg-card p-8 sm:p-10">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
+
+        <section className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
+          <div className="rounded-[1.75rem] border border-[#EAD9C4] bg-white px-8 py-9 shadow-sm sm:px-10">
+            <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-[#C17B2F]">
+              Why it works
+            </p>
+            <h2 className="font-heading text-2xl font-bold tracking-tight text-[#1A1510]">
               Stop guessing. Start cooking.
             </h2>
-            <p className="mt-3 max-w-2xl text-pretty leading-relaxed text-muted-foreground">
+            <p className="mt-3 max-w-2xl text-pretty leading-relaxed text-[#5C5043]">
               This plan removes the daily &quot;what should I eat?&quot; stress. You get a clear weekly
               structure, affordable recipes, and a simple cooking guide designed around a real student
               budget &mdash; so you eat better without overspending.
@@ -177,27 +238,33 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* What you get */}
-        <section id="what-you-get" className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-          <div className="grid items-start gap-8 lg:grid-cols-2">
+
+        <section id="what-you-get" className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
+          <div className="grid items-start gap-10 lg:grid-cols-2">
             <div>
-              <h2 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-[#C17B2F]">
+                Included
+              </p>
+              <h2 className="font-heading text-2xl font-bold tracking-tight text-[#1A1510] sm:text-3xl">
                 What you get
               </h2>
-              <p className="mt-2 text-muted-foreground">Everything you need to eat well this semester.</p>
+              <p className="mt-2 text-[#7A6A55]">Everything you need to eat well this semester.</p>
               <ul className="mt-6 space-y-3">
                 {INCLUDES.map((item) => (
-                  <li key={item} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+                  <li
+                    key={item}
+                    className="flex items-start gap-3.5 rounded-2xl border border-[#EAD9C4] bg-white px-5 py-4 shadow-[0_1px_4px_rgba(90,55,20,0.06)] transition-shadow hover:shadow-[0_4px_16px_rgba(90,55,20,0.09)]"
+                  >
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200">
                       <Check className="h-3.5 w-3.5" />
                     </span>
-                    <span className="font-medium text-foreground">{item}</span>
+                    <span className="font-medium text-[#1A1510]">{item}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-lg">
+            <div className="overflow-hidden rounded-[1.75rem] border border-[#EAD9C4] bg-white shadow-[0_8px_32px_rgba(90,55,20,0.10)]">
               <Image
                 src="/meal-plan-preview.png"
                 alt="Preview of the weekly meal plan layout"
@@ -205,9 +272,9 @@ export default async function LandingPage() {
                 height={540}
                 className="w-full object-cover"
               />
-              <div className="border-t border-border p-5">
-                <p className="text-sm font-medium text-foreground">A clean weekly layout</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+              <div className="border-t border-[#EAD9C4] px-6 py-5">
+                <p className="text-sm font-semibold text-[#1A1510]">A clean weekly layout</p>
+                <p className="mt-1 text-sm text-[#7A6A55]">
                   Know exactly what to cook each day, with budget-friendly ingredients.
                 </p>
               </div>
@@ -215,74 +282,114 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* Reviews */}
-        <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+
+        <section className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
           <div className="flex items-end justify-between gap-4">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Loved by students
-            </h2>
+            <div>
+              <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-[#C17B2F]">
+                Reviews
+              </p>
+              <h2 className="font-heading text-2xl font-bold tracking-tight text-[#1A1510] sm:text-3xl">
+                Loved by students
+              </h2>
+            </div>
             <div className="flex items-center gap-2">
               <StarRating rating={4.7} />
-              <span className="text-sm text-muted-foreground">4.7 / 5</span>
+              <span className="text-sm text-[#9A8A76]">4.7 / 5</span>
             </div>
           </div>
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {REVIEWS.map((r) => (
-              <figure key={r.name} className="flex flex-col rounded-2xl border border-border bg-card p-6">
+              <figure
+                key={r.name}
+                className="flex flex-col rounded-2xl border border-[#EAD9C4] bg-white p-6 shadow-[0_2px_12px_rgba(90,55,20,0.07)]"
+              >
                 <StarRating rating={r.rating} />
-                <blockquote className="mt-3 flex-1 text-pretty leading-relaxed text-foreground">
+                <blockquote className="mt-3 flex-1 text-pretty text-[0.95rem] leading-relaxed text-[#2E2518]">
                   &ldquo;{r.text}&rdquo;
                 </blockquote>
-                <figcaption className="mt-4 flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                <figcaption className="mt-5 flex items-center gap-2.5 border-t border-[#F0E6D3] pt-4">
+                  <Avatar className="h-8 w-8 ring-1 ring-[#F0D9B5]">
+                    <AvatarFallback className="bg-[#FEF3E2] text-xs font-bold text-[#C17B2F]">
                       {r.name.slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-medium text-foreground">{r.name}</span>
+                  <span className="text-sm font-semibold text-[#1A1510]">{r.name}</span>
                 </figcaption>
               </figure>
             ))}
           </div>
         </section>
 
-        {/* FAQ */}
-        <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-          <h2 className="text-center font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+
+        <section className="mx-auto max-w-3xl px-5 py-8 sm:px-8">
+          <p className="mb-1 text-center text-xs font-bold uppercase tracking-[0.14em] text-[#C17B2F]">
+            FAQ
+          </p>
+          <h2 className="text-center font-heading text-2xl font-bold tracking-tight text-[#1A1510] sm:text-3xl">
             Frequently asked questions
           </h2>
-          <Accordion type="single" collapsible className="mt-6 w-full">
-            {FAQ.map((item, i) => (
-              <AccordionItem key={item.q} value={`item-${i}`} className="border-border">
-                <AccordionTrigger className="text-left font-medium text-foreground hover:no-underline">
-                  {item.q}
-                </AccordionTrigger>
-                <AccordionContent className="leading-relaxed text-muted-foreground">
-                  {item.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+          <div className="mt-8 overflow-hidden rounded-[1.75rem] border border-[#EAD9C4] bg-white shadow-sm">
+            {/*@ts-expect-error asChild prop is not recognized by the Accordion component */}
+            <Accordion type="single" collapsible className="w-full divide-y divide-[#EAD9C4]">
+              {FAQ.map((item, i) => (
+                <AccordionItem key={item.q} value={`item-${i}`} className="border-none px-6">
+                  <AccordionTrigger className="py-5 text-left text-[0.95rem] font-semibold text-[#1A1510] hover:no-underline hover:text-[#C17B2F]">
+                    {item.q}
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-5 text-[0.9rem] leading-relaxed text-[#5C5043]">
+                    {item.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
         </section>
 
-        {/* Final CTA */}
-        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-12 text-center sm:px-10">
-            <div className="pointer-events-none absolute inset-0 opacity-20 [background:radial-gradient(circle_at_30%_20%,white,transparent_45%)]" />
+
+        <section className="mx-auto max-w-6xl px-5 py-12 sm:px-8">
+          <div
+            className="relative overflow-hidden rounded-[2rem] px-7 py-14 text-center sm:px-12"
+            style={{
+              background: "linear-gradient(145deg, #C97120 0%, #E8922A 45%, #D4832A 100%)",
+            }}
+          >
+            {/* Subtle inner highlight */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.18) 0%, transparent 55%)",
+              }}
+            />
+            {/* Decorative grain texture overlay */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.04]"
+              style={{
+                backgroundImage:
+                  "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                backgroundSize: "200px 200px",
+              }}
+            />
+
             <div className="relative">
-              <h2 className="font-heading text-2xl font-semibold tracking-tight text-primary-foreground sm:text-3xl text-balance">
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-white/70">
+                Get started today
+              </p>
+              <h2 className="font-heading text-balance text-2xl font-bold tracking-tight text-white sm:text-[2rem]">
                 Ready to eat better on a student budget?
               </h2>
-              <p className="mx-auto mt-3 max-w-md text-pretty leading-relaxed text-primary-foreground/80">
-                Get instant access to the Chef Temmie Student Meal Plan today.
+              <p className="mx-auto mt-3 max-w-md text-pretty leading-relaxed text-white/80">
+                Get instant access to the Chef Temmie Student Meal Plan.
               </p>
               <Button
-                asChild
+
                 size="lg"
-                variant="secondary"
-                className="mt-7 h-12 gap-2 rounded-xl px-8 text-base font-semibold"
+                className="mt-8 h-13 gap-2 rounded-2xl bg-white px-9 text-[0.95rem] font-bold text-[#C17B2F] shadow-[0_8px_28px_rgba(0,0,0,0.18)] transition-all duration-200 hover:bg-[#FEF9F0] hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgba(0,0,0,0.22)]"
               >
-                <Link href="/checkout">
+                <Link href="/checkout" className="flex items-center gap-2" >
                   Buy Access &middot; {price}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -294,10 +401,19 @@ export default async function LandingPage() {
 
       <SiteFooter />
 
-      {/* Sticky mobile CTA */}
-      <div className="sticky bottom-0 z-30 border-t border-border bg-background/90 p-3 backdrop-blur-xl lg:hidden">
-        <Button asChild size="lg" className="h-12 w-full gap-2 rounded-xl text-base">
-          <Link href="/checkout">
+
+      <div className="sticky bottom-0 z-30 border-t border-[#EAD9C4] bg-white/95 p-3 backdrop-blur-xl lg:hidden">
+        <Button
+
+          size="lg"
+          className="h-12 w-full gap-2 rounded-xl text-[0.95rem] font-bold shadow-[0_4px_16px_rgba(196,120,40,0.24)]"
+          style={{
+            background: "linear-gradient(135deg,#E8922A 0%,#C97120 100%)",
+            color: "#fff",
+            border: "none",
+          }}
+        >
+          <Link href="/checkout" className="flex items-center gap-2" >
             Buy Access &middot; {price}
             <ArrowRight className="h-4 w-4" />
           </Link>

@@ -37,13 +37,13 @@ export default async function SuccessPage({
           ) : null}
 
           <div className="mt-8 flex flex-col gap-3">
-            <Button asChild size="lg" className="h-12 gap-2 rounded-xl text-base">
-              <Link href="/purchases">
+            <Button size="lg" className="h-12 gap-2 rounded-xl text-base">
+              <Link href="/purchases" className="flex gap-2 items-center">
                 View my purchases
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="h-12 rounded-xl text-base">
+            <Button size="lg" variant="outline" className="h-12 rounded-xl text-base">
               <Link href="/">Back to home</Link>
             </Button>
           </div>

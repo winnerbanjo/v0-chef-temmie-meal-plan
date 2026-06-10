@@ -12,7 +12,17 @@ export const dynamic = "force-dynamic"
 
 export default async function CheckoutPage() {
   const product = await getActiveProduct()
-  if (!product) notFound()
+
+  console.log("[CHECKOUT_ACTIVE_PRODUCT]", product)
+
+  if (!product) {
+    return (
+      <div className="p-10">
+        <h1>No active product found</h1>
+        <p>Your checkout page is working, but getActiveProduct() returned nothing.</p>
+      </div>
+    )
+  }
 
   const price = formatPrice(product.price, product.currency)
   const image = product.imageUrl ?? "/meal-plan-cover.png"

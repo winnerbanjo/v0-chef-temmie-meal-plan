@@ -1,13 +1,21 @@
 import { db } from "@/lib/db"
 import { emailLogs } from "@/lib/db/schema"
+import { transporter } from "./email/transporter";
 
-// Parse "Name <email@domain>" or a bare email address into Mailtrap's sender shape.
-function parseSender(): { email: string; name: string } {
-  const raw = process.env.EMAIL_FROM || "Chef Temmie <hello@cheftemmie.com>"
-  const match = raw.match(/^\s*(.*?)\s*<\s*(.+?)\s*>\s*$/)
-  if (match) return { name: match[1] || "Chef Temmie", email: match[2] }
-  return { name: "Chef Temmie", email: raw.trim() }
+// Parse "Name <email@domain>" or use env values as a fallback.
+function parseSender(): string {
+  const raw = process.env.EMAIL_FROM?.trim()
+
+  if (raw) {
+    return raw
+  }
+
+  const name = process.env.MAIL_FROM_NAME || "Chef Temmie"
+  const email = process.env.MAIL_FROM_EMAIL || "hello@cheftemmie.com"
+
+  return `"${name}" <${email}>`
 }
+
 
 type SendArgs = {
   to: string
@@ -17,48 +25,59 @@ type SendArgs = {
   metadata?: Record<string, unknown>
 }
 
-/**
- * Sends an email via Mailtrap when MAILTRAP_TOKEN is configured.
- *  - If MAILTRAP_TEST_INBOX_ID is set, emails are routed to the Mailtrap
- *    sandbox (testing) inbox instead of being delivered to real recipients.
- *  - Otherwise emails are sent through Mailtrap's live sending stream.
- * In preview / when no token is set, it logs the email instead so the
- * full flow still works end-to-end. Every send is recorded in email_logs.
- */
-export async function sendEmail({ to, subject, html, type, metadata }: SendArgs) {
-  let status: "sent" | "failed" = "sent"
+
+
+
+
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  type,
+  metadata,
+}: SendArgs) {
+  let status: "sent" | "failed" = "sent";
 
   try {
-    if (process.env.MAILTRAP_TOKEN) {
-      const { MailtrapClient } = await import("mailtrap")
-      const testInboxId = process.env.MAILTRAP_TEST_INBOX_ID
-      const client = new MailtrapClient(
-        testInboxId
-          ? { token: process.env.MAILTRAP_TOKEN, testInboxId: Number(testInboxId), sandbox: true }
-          : { token: process.env.MAILTRAP_TOKEN },
-      )
-      await client.send({
+    if (!transporter) {
+      console.log(`[email:mock] to=${to} subject="${subject}"`);
+    } else {
+      await transporter.sendMail({
         from: parseSender(),
-        to: [{ email: to }],
+        to,
         subject,
         html,
-        category: type,
-      })
-    } else {
-      console.log(`[v0] [email:mock] to=${to} subject="${subject}"`)
+      });
+
+      console.log("[email:sent]", {
+        to,
+        subject,
+        type,
+      });
     }
-  } catch (err) {
-    status = "failed"
-    console.log("[v0] sendEmail error:", err)
+  } catch (err: any) {
+    status = "failed";
+
+    console.log("[email:error]", {
+      message: err?.message,
+      code: err?.code,
+      status: err?.response?.status,
+      response: err?.response?.data,
+    });
   }
 
   try {
-    await db.insert(emailLogs).values({ email: to, type, status, metadata: metadata ?? null })
+    await db.insert(emailLogs).values({
+      email: to,
+      type,
+      status,
+      metadata: metadata ?? null,
+    });
   } catch (err) {
-    console.log("[v0] email log insert error:", err)
+    console.log("[email:log-error]", err);
   }
 
-  return { status }
+  return { status };
 }
 
 const baseStyle = `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#f5f6fb;padding:32px;color:#1e1b3a`
