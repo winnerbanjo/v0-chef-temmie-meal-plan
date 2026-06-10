@@ -1,7 +1,13 @@
 import { db } from "@/lib/db"
 import { emailLogs } from "@/lib/db/schema"
 
-const FROM = process.env.EMAIL_FROM || "Chef Temmie <onboarding@resend.dev>"
+// Parse "Name <email@domain>" or a bare email address into Mailtrap's sender shape.
+function parseSender(): { email: string; name: string } {
+  const raw = process.env.EMAIL_FROM || "Chef Temmie <hello@cheftemmie.com>"
+  const match = raw.match(/^\s*(.*?)\s*<\s*(.+?)\s*>\s*$/)
+  if (match) return { name: match[1] || "Chef Temmie", email: match[2] }
+  return { name: "Chef Temmie", email: raw.trim() }
+}
 
 type SendArgs = {
   to: string
@@ -12,22 +18,32 @@ type SendArgs = {
 }
 
 /**
- * Sends an email via Resend when RESEND_API_KEY is configured.
- * In preview / when no key is set, it logs the email instead so the
+ * Sends an email via Mailtrap when MAILTRAP_TOKEN is configured.
+ *  - If MAILTRAP_TEST_INBOX_ID is set, emails are routed to the Mailtrap
+ *    sandbox (testing) inbox instead of being delivered to real recipients.
+ *  - Otherwise emails are sent through Mailtrap's live sending stream.
+ * In preview / when no token is set, it logs the email instead so the
  * full flow still works end-to-end. Every send is recorded in email_logs.
  */
 export async function sendEmail({ to, subject, html, type, metadata }: SendArgs) {
   let status: "sent" | "failed" = "sent"
 
   try {
-    if (process.env.RESEND_API_KEY) {
-      const { Resend } = await import("resend")
-      const resend = new Resend(process.env.RESEND_API_KEY)
-      const { error } = await resend.emails.send({ from: FROM, to, subject, html })
-      if (error) {
-        status = "failed"
-        console.log("[v0] Resend error:", error)
-      }
+    if (process.env.MAILTRAP_TOKEN) {
+      const { MailtrapClient } = await import("mailtrap")
+      const testInboxId = process.env.MAILTRAP_TEST_INBOX_ID
+      const client = new MailtrapClient(
+        testInboxId
+          ? { token: process.env.MAILTRAP_TOKEN, testInboxId: Number(testInboxId), sandbox: true }
+          : { token: process.env.MAILTRAP_TOKEN },
+      )
+      await client.send({
+        from: parseSender(),
+        to: [{ email: to }],
+        subject,
+        html,
+        category: type,
+      })
     } else {
       console.log(`[v0] [email:mock] to=${to} subject="${subject}"`)
     }
