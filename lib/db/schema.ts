@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 
 export const appUsers = pgTable("app_users", {
@@ -16,16 +17,43 @@ export const appUsers = pgTable("app_users", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const subscribers = pgTable("subscribers", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  email: text("email").notNull(),
-  sourcePlatform: text("source_platform"),
-  status: text("status").notNull().default("active"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-})
 
+export const subscribers = pgTable(
+  "subscribers",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id"),
+    email: text("email").notNull(),
+    sourcePlatform: text("source_platform"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    emailUniqueIdx: uniqueIndex("subscribers_email_unique_idx").on(table.email),
+  })
+)
+
+export const purchases = pgTable(
+  "purchases",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id"),
+    productId: integer("product_id"),
+    email: text("email").notNull(),
+    amount: integer("amount").notNull().default(0),
+    currency: text("currency").notNull().default("USD"),
+    status: text("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    emailProductUniqueIdx: uniqueIndex("purchases_email_product_unique_idx").on(
+      table.email,
+      table.productId
+    ),
+  })
+)
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -36,18 +64,6 @@ export const products = pgTable("products", {
   imageUrl: text("image_url"),
   fileUrl: text("file_url"),
   isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-})
-
-export const purchases = pgTable("purchases", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  productId: integer("product_id"),
-  email: text("email").notNull(),
-  amount: integer("amount").notNull().default(0),
-  currency: text("currency").notNull().default("USD"),
-  status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
