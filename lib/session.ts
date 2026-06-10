@@ -80,5 +80,6 @@ export async function clearAdminSession() {
 export function checkAdminCredentials(email: string, password: string): boolean {
   const adminEmail = process.env.ADMIN_EMAIL || "admin@cheftemmie.com"
   const adminPassword = process.env.ADMIN_PASSWORD || "admin1234"
+  console.log(adminEmail, adminPassword, email, password)
   return email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword
 }

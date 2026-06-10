@@ -41,7 +41,7 @@ export default async function MealPlanPage() {
             <p className="mt-2 text-muted-foreground">
               We couldn&apos;t find a completed purchase for {email}.
             </p>
-            <Button asChild className="mt-6 rounded-xl">
+            <Button className="mt-6 rounded-xl">
               <Link href="/">Browse the meal plan</Link>
             </Button>
           </div>
@@ -95,8 +95,8 @@ export default async function MealPlanPage() {
 
                     <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                       {p.fileUrl ? (
-                        <Button asChild size="lg" className="h-12 gap-2 rounded-xl text-base">
-                          <a href={p.fileUrl} target="_blank" rel="noopener noreferrer">
+                        <Button size="lg" className="h-12 gap-2 rounded-xl text-base">
+                          <a href={p.fileUrl} target="_blank" className="flex items-center gap-2" rel="noopener noreferrer">
                             <Download className="h-4 w-4" />
                             Download meal plan
                           </a>
@@ -108,8 +108,8 @@ export default async function MealPlanPage() {
                         </Button>
                       )}
                       {p.fileUrl ? (
-                        <Button asChild size="lg" variant="outline" className="h-12 gap-2 rounded-xl bg-transparent text-base">
-                          <a href={p.fileUrl} target="_blank" rel="noopener noreferrer">
+                        <Button size="lg" variant="outline" className="h-12 gap-2 rounded-xl bg-transparent text-base">
+                          <a href={p.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                             <ExternalLink className="h-4 w-4" />
                             View online
                           </a>
