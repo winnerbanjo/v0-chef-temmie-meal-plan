@@ -5,6 +5,7 @@ import { pool } from "@/lib/db"
 const PRODUCT_SLUG = "chef-temmie-student-meal-plan"
 const DEFAULT_JSON_PATH = path.join(process.cwd(), "data", "import-users.json")
 const DEFAULT_BATCH_SIZE = 1000
+const IMPORT_LOCK_ID = 903_110_144
 
 export type ImportUserJsonRow = {
   email: string
@@ -22,6 +23,8 @@ export type ImportUsersJsonResult = {
   failed: number
   dryRun: boolean
   batches: number
+  alreadyRunning: boolean
+  message: string
   errors: Array<{ batch: number; message: string }>
 }
 
@@ -184,6 +187,8 @@ export async function importUsersFromJson({
     failed: 0,
     dryRun,
     batches: batches.length,
+    alreadyRunning: false,
+    message: dryRun ? "Dry run complete." : "Import complete.",
     errors: [],
   }
 
@@ -192,14 +197,37 @@ export async function importUsersFromJson({
     return result
   }
 
-  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-    const batch = batches[batchIndex]
-    const batchResult = await importBatch(batch, batchIndex)
-    result.imported += batchResult.imported
-    result.failed += batchResult.failed
-    if (batchResult.error) {
-      result.errors.push({ batch: batchIndex + 1, message: batchResult.error })
+  const lockClient = await pool.connect()
+  let lockAcquired = false
+
+  try {
+    const lock = await lockClient.query<{ locked: boolean }>("SELECT pg_try_advisory_lock($1) AS locked", [
+      IMPORT_LOCK_ID,
+    ])
+    lockAcquired = Boolean(lock.rows[0]?.locked)
+
+    if (!lockAcquired) {
+      return {
+        ...result,
+        alreadyRunning: true,
+        message: "Import already running. This tick backed off.",
+      }
     }
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex]
+      const batchResult = await importBatch(batch, batchIndex)
+      result.imported += batchResult.imported
+      result.failed += batchResult.failed
+      if (batchResult.error) {
+        result.errors.push({ batch: batchIndex + 1, message: batchResult.error })
+      }
+    }
+  } finally {
+    if (lockAcquired) {
+      await lockClient.query("SELECT pg_advisory_unlock($1)", [IMPORT_LOCK_ID]).catch(() => null)
+    }
+    lockClient.release()
   }
 
   return result

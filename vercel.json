@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/import-users",
-      "schedule": "0 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }
