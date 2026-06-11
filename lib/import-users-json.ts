@@ -4,7 +4,8 @@ import { pool } from "@/lib/db"
 
 const PRODUCT_SLUG = "chef-temmie-student-meal-plan"
 const DEFAULT_JSON_PATH = path.join(process.cwd(), "data", "import-users.json")
-const DEFAULT_BATCH_SIZE = 1000
+const DEFAULT_CHECKPOINT_PATH = path.join(process.cwd(), "data", "import-users-checkpoint.json")
+const DEFAULT_BATCH_SIZE = 250
 const IMPORT_LOCK_ID = 903_110_144
 
 export type ImportUserJsonRow = {
@@ -23,6 +24,8 @@ export type ImportUsersJsonResult = {
   failed: number
   dryRun: boolean
   batches: number
+  startBatchIndex: number
+  lastCompletedBatchIndex: number
   alreadyRunning: boolean
   message: string
   errors: Array<{ batch: number; message: string }>
@@ -78,6 +81,37 @@ export function readImportUsersJson(filePath = DEFAULT_JSON_PATH) {
   }
 
   return parsed as ImportUserJsonRow[]
+}
+
+function readCheckpoint(checkpointPath = DEFAULT_CHECKPOINT_PATH, resetCheckpoint = false) {
+  if (resetCheckpoint || !fs.existsSync(checkpointPath)) {
+    return { lastCompletedBatchIndex: -1 }
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(checkpointPath, "utf8"))
+    return {
+      lastCompletedBatchIndex:
+        typeof parsed.lastCompletedBatchIndex === "number" ? parsed.lastCompletedBatchIndex : -1,
+    }
+  } catch {
+    return { lastCompletedBatchIndex: -1 }
+  }
+}
+
+function writeCheckpoint(batchIndex: number, checkpointPath = DEFAULT_CHECKPOINT_PATH) {
+  fs.writeFileSync(
+    checkpointPath,
+    `${JSON.stringify(
+      {
+        lastCompletedBatchIndex: batchIndex,
+        lastCompletedBatch: batchIndex + 1,
+        updatedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    )}\n`,
+  )
 }
 
 async function importBatch(rows: ImportUserJsonRow[], batchIndex: number) {
@@ -168,16 +202,23 @@ async function importBatch(rows: ImportUserJsonRow[], batchIndex: number) {
 
 export async function importUsersFromJson({
   filePath = DEFAULT_JSON_PATH,
+  checkpointPath = DEFAULT_CHECKPOINT_PATH,
   batchSize = DEFAULT_BATCH_SIZE,
   dryRun = false,
+  resetCheckpoint = false,
 }: {
   filePath?: string
+  checkpointPath?: string
   batchSize?: number
   dryRun?: boolean
+  resetCheckpoint?: boolean
 } = {}): Promise<ImportUsersJsonResult> {
   const rawRows = readImportUsersJson(filePath)
   const normalized = normalizeRows(rawRows)
-  const batches = chunkArray(normalized.rows, Math.max(1, batchSize))
+  const effectiveBatchSize = Math.max(1, batchSize)
+  const batches = chunkArray(normalized.rows, effectiveBatchSize)
+  const checkpoint = readCheckpoint(checkpointPath, resetCheckpoint)
+  const startBatchIndex = checkpoint.lastCompletedBatchIndex + 1
   const result: ImportUsersJsonResult = {
     productSlug: PRODUCT_SLUG,
     rawRows: rawRows.length,
@@ -187,14 +228,27 @@ export async function importUsersFromJson({
     failed: 0,
     dryRun,
     batches: batches.length,
+    startBatchIndex,
+    lastCompletedBatchIndex: checkpoint.lastCompletedBatchIndex,
     alreadyRunning: false,
     message: dryRun ? "Dry run complete." : "Import complete.",
     errors: [],
   }
 
   if (dryRun) {
-    result.imported = normalized.rows.length
+    result.imported = startBatchIndex >= batches.length ? 0 : normalized.rows.slice(startBatchIndex * effectiveBatchSize).length
+    result.message =
+      startBatchIndex >= batches.length
+        ? "All batches have already been completed based on the checkpoint file."
+        : "Dry run complete."
     return result
+  }
+
+  if (startBatchIndex >= batches.length) {
+    return {
+      ...result,
+      message: "All batches have already been completed based on the checkpoint file.",
+    }
   }
 
   const lockClient = await pool.connect()
@@ -214,13 +268,16 @@ export async function importUsersFromJson({
       }
     }
 
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    for (let batchIndex = startBatchIndex; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex]
       const batchResult = await importBatch(batch, batchIndex)
       result.imported += batchResult.imported
       result.failed += batchResult.failed
       if (batchResult.error) {
         result.errors.push({ batch: batchIndex + 1, message: batchResult.error })
+      } else {
+        writeCheckpoint(batchIndex, checkpointPath)
+        result.lastCompletedBatchIndex = batchIndex
       }
     }
   } finally {

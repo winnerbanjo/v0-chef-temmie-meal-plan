@@ -17,12 +17,14 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url)
   const dryRun = url.searchParams.get("dryRun") === "true"
-  const batchSize = Number(url.searchParams.get("batchSize") || "1000")
+  const resetCheckpoint = url.searchParams.get("resetCheckpoint") === "true"
+  const batchSize = Number(url.searchParams.get("batchSize") || "250")
 
   try {
     const result = await importUsersFromJson({
       dryRun,
-      batchSize: Number.isFinite(batchSize) ? batchSize : 1000,
+      resetCheckpoint,
+      batchSize: Number.isFinite(batchSize) ? batchSize : 250,
     })
 
     return NextResponse.json(result, { status: result.failed > 0 ? 207 : 200 })
