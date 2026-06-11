@@ -10,13 +10,19 @@ type ImportRow = Record<string, string | undefined>
 
 const PRODUCT_SLUG = "chef-temmie-student-meal-plan"
 const CSV_PATH = path.join(process.cwd(), "data", "import-users.csv")
+const CHECKPOINT_PATH = path.join(process.cwd(), "data", "import-users-checkpoint.json")
+
 const BATCH_SIZE = 250
 const DRY_RUN = process.argv.includes("--dry-run")
+const RESET_CHECKPOINT = process.argv.includes("--reset-checkpoint")
 
 function getValue(row: ImportRow, keys: string[]) {
     for (const key of keys) {
         const value = row[key]
-        if (value && value.trim()) return value.trim()
+
+        if (value && value.trim()) {
+            return value.trim()
+        }
     }
 
     return ""
@@ -40,16 +46,37 @@ function guessNameFromEmail(email: string) {
 }
 
 function normalizeName(row: ImportRow, email: string) {
-    const fullName = getValue(row, ["fullName", "Full name", "Full Name", "name", "Name"])
+    const fullName = getValue(row, [
+        "fullName",
+        "Full name",
+        "Full Name",
+        "name",
+        "Name",
+    ])
 
-    if (fullName) return fullName
+    if (fullName) {
+        return fullName
+    }
 
-    const firstName = getValue(row, ["First name", "First Name", "firstName", "firstname"])
-    const lastName = getValue(row, ["Last name", "Last Name", "lastName", "lastname"])
+    const firstName = getValue(row, [
+        "First name",
+        "First Name",
+        "firstName",
+        "firstname",
+    ])
+
+    const lastName = getValue(row, [
+        "Last name",
+        "Last Name",
+        "lastName",
+        "lastname",
+    ])
 
     const joinedName = `${firstName} ${lastName}`.trim()
 
-    if (joinedName) return joinedName
+    if (joinedName) {
+        return joinedName
+    }
 
     return guessNameFromEmail(email)
 }
@@ -78,6 +105,51 @@ function chunkArray<T>(items: T[], size: number): T[][] {
     }
 
     return chunks
+}
+
+function readCheckpoint() {
+    if (RESET_CHECKPOINT) {
+        return {
+            lastCompletedBatchIndex: -1,
+        }
+    }
+
+    if (!fs.existsSync(CHECKPOINT_PATH)) {
+        return {
+            lastCompletedBatchIndex: -1,
+        }
+    }
+
+    try {
+        const raw = fs.readFileSync(CHECKPOINT_PATH, "utf8")
+        const parsed = JSON.parse(raw)
+
+        return {
+            lastCompletedBatchIndex:
+                typeof parsed.lastCompletedBatchIndex === "number"
+                    ? parsed.lastCompletedBatchIndex
+                    : -1,
+        }
+    } catch {
+        return {
+            lastCompletedBatchIndex: -1,
+        }
+    }
+}
+
+function writeCheckpoint(batchIndex: number) {
+    fs.writeFileSync(
+        CHECKPOINT_PATH,
+        JSON.stringify(
+            {
+                lastCompletedBatchIndex: batchIndex,
+                lastCompletedBatch: batchIndex + 1,
+                updatedAt: new Date().toISOString(),
+            },
+            null,
+            2
+        )
+    )
 }
 
 async function getProduct() {
@@ -227,7 +299,9 @@ async function importSingleUser(row: ImportRow, product: typeof products.$inferS
 async function main() {
     console.log("[IMPORT_START]", {
         csvPath: CSV_PATH,
+        checkpointPath: CHECKPOINT_PATH,
         dryRun: DRY_RUN,
+        resetCheckpoint: RESET_CHECKPOINT,
         batchSize: BATCH_SIZE,
     })
 
@@ -263,6 +337,9 @@ async function main() {
     const batches = chunkArray(uniqueRows, BATCH_SIZE)
     const product = await getProduct()
 
+    const checkpoint = readCheckpoint()
+    const startBatchIndex = checkpoint.lastCompletedBatchIndex + 1
+
     console.log("[IMPORT_PRODUCT]", {
         id: product.id,
         title: product.title,
@@ -278,22 +355,43 @@ async function main() {
         batches: batches.length,
     })
 
-    console.log("[IMPORT_SAMPLE]", uniqueRows.slice(0, 3).map((row) => ({
-        email: normalizeEmail(row),
-        fullName: normalizeName(row, normalizeEmail(row)),
-        sourcePlatform: normalizeSource(row),
-        status: normalizeStatus(row),
-    })))
+    console.log("[IMPORT_RESUME]", {
+        lastCompletedBatchIndex: checkpoint.lastCompletedBatchIndex,
+        lastCompletedBatch: checkpoint.lastCompletedBatchIndex + 1,
+        startingFromBatchIndex: startBatchIndex,
+        startingFromBatch: startBatchIndex + 1,
+        totalBatches: batches.length,
+    })
+
+    console.log(
+        "[IMPORT_SAMPLE]",
+        uniqueRows.slice(0, 3).map((row) => ({
+            email: normalizeEmail(row),
+            fullName: normalizeName(row, normalizeEmail(row)),
+            sourcePlatform: normalizeSource(row),
+            status: normalizeStatus(row),
+        }))
+    )
+
+    if (startBatchIndex >= batches.length) {
+        console.log("[IMPORT_ALREADY_COMPLETE]", {
+            message: "All batches have already been completed based on the checkpoint file.",
+            totalBatches: batches.length,
+        })
+
+        return
+    }
 
     let imported = 0
     let skipped = 0
     let failed = 0
 
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    for (let batchIndex = startBatchIndex; batchIndex < batches.length; batchIndex++) {
         const batch = batches[batchIndex]
 
         console.log("[IMPORT_BATCH_START]", {
             batch: batchIndex + 1,
+            batchIndex,
             totalBatches: batches.length,
             size: batch.length,
         })
@@ -306,10 +404,12 @@ async function main() {
                     imported++
                 } else {
                     skipped++
+
                     console.log("[IMPORT_SKIPPED]", result)
                 }
             } catch (error: any) {
                 failed++
+
                 console.error("[IMPORT_FAILED]", {
                     email: normalizeEmail(row),
                     message: error.message,
@@ -320,9 +420,17 @@ async function main() {
 
         console.log("[IMPORT_BATCH_DONE]", {
             batch: batchIndex + 1,
+            batchIndex,
             imported,
             skipped,
             failed,
+        })
+
+        writeCheckpoint(batchIndex)
+
+        console.log("[IMPORT_CHECKPOINT_SAVED]", {
+            lastCompletedBatch: batchIndex + 1,
+            lastCompletedBatchIndex: batchIndex,
         })
 
         await new Promise((resolve) => setTimeout(resolve, 300))

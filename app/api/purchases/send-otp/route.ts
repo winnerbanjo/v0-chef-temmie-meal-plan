@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, type: "otp" })
 
     // In preview without a mail provider, surface the OTP so the flow is testable.
-    const devOtp = process.env.MAILTRAP_TOKEN ? undefined : otp
+    const devOtp = process.env.MAILTRAP_API_TOKEN ? undefined : otp
 
     return NextResponse.json({ success: true, devOtp })
   } catch (err) {
