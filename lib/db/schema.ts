@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   jsonb,
+  index,
   uniqueIndex,
 } from "drizzle-orm/pg-core"
 
@@ -96,3 +97,78 @@ export const emailLogs = pgTable("email_logs", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const emailCampaigns = pgTable(
+  "email_campaigns",
+  {
+    id: serial("id").primaryKey(),
+    type: text("type").notNull().default("meal_plan"),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    audience: text("audience").notNull().default("subscribers"),
+    status: text("status").notNull().default("queued"),
+    recipientCount: integer("recipient_count").notNull().default(0),
+    sentCount: integer("sent_count").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => ({
+    statusIdx: index("email_campaigns_status_idx").on(table.status),
+    createdAtIdx: index("email_campaigns_created_at_idx").on(table.createdAt),
+  }),
+)
+
+export const emailCampaignRecipients = pgTable(
+  "email_campaign_recipients",
+  {
+    id: serial("id").primaryKey(),
+    campaignId: integer("campaign_id").notNull(),
+    email: text("email").notNull(),
+    name: text("name"),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull().defaultNow(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    campaignStatusIdx: index("email_campaign_recipients_campaign_status_idx").on(table.campaignId, table.status),
+    scheduledIdx: index("email_campaign_recipients_scheduled_idx").on(table.scheduledAt),
+    emailIdx: index("email_campaign_recipients_email_idx").on(table.email),
+  }),
+)
+
+export const emailUsage = pgTable(
+  "email_usage",
+  {
+    id: serial("id").primaryKey(),
+    month: text("month").notNull(),
+    provider: text("provider").notNull().default("mailtrap"),
+    sentCount: integer("sent_count").notNull().default(0),
+    monthlyLimit: integer("monthly_limit").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    monthProviderUniqueIdx: uniqueIndex("email_usage_month_provider_unique_idx").on(table.month, table.provider),
+  }),
+)
+
+export const emailSuppressions = pgTable(
+  "email_suppressions",
+  {
+    id: serial("id").primaryKey(),
+    email: text("email").notNull(),
+    reason: text("reason").notNull().default("unsubscribe"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    emailUniqueIdx: uniqueIndex("email_suppressions_email_unique_idx").on(table.email),
+  }),
+)

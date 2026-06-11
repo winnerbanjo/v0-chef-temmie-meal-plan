@@ -18,9 +18,7 @@ export function SiteFooter() {
           <Link href="/purchases" className="transition-colors hover:text-foreground">
             My Purchases
           </Link>
-          <Link href="/admin" className="transition-colors hover:text-foreground">
-            Admin
-          </Link>
+
         </div>
       </div>
     </footer>

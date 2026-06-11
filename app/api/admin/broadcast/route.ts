@@ -1,20 +1,32 @@
 import { NextResponse } from "next/server"
-import { eq, desc, gte, and } from "drizzle-orm"
+import { eq, desc, gte, and, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { appUsers, subscribers, purchases, emailBroadcasts } from "@/lib/db/schema"
 import { broadcastSchema } from "@/lib/validation"
 import { getAdminEmail } from "@/lib/session"
 import { sendEmail, broadcastEmail } from "@/lib/email"
 
-export async function GET() {
+function getPagination(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1)
+  const pageSize = Math.min(50, Math.max(5, Number(searchParams.get("pageSize") ?? 10) || 10))
+
+  return { page, pageSize, offset: (page - 1) * pageSize }
+}
+
+export async function GET(req: Request) {
   if (!(await getAdminEmail())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+  const { page, pageSize, offset } = getPagination(req)
+  const [totalRow] = await db.select({ c: sql<number>`count(*)::int` }).from(emailBroadcasts)
+  const total = totalRow?.c ?? 0
   const rows = await db
     .select()
     .from(emailBroadcasts)
     .orderBy(desc(emailBroadcasts.createdAt))
-    .limit(10)
+    .limit(pageSize)
+    .offset(offset)
 
   const startOfDay = new Date()
   startOfDay.setHours(0, 0, 0, 0)
@@ -24,7 +36,16 @@ export async function GET() {
     .where(and(gte(emailBroadcasts.createdAt, startOfDay), eq(emailBroadcasts.status, "sent")))
     .limit(1)
 
-  return NextResponse.json({ broadcasts: rows, sentToday: Boolean(todays) })
+  return NextResponse.json({
+    broadcasts: rows,
+    sentToday: Boolean(todays),
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+  })
 }
 
 export async function POST(req: Request) {

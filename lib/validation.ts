@@ -25,6 +25,11 @@ export const broadcastSchema = z.object({
   audience: z.enum(["all", "subscribers", "purchasers"]),
 })
 
+export const emailCampaignSchema = z.object({
+  subject: z.string().trim().min(3, "Subject is required").max(160, "Subject is too long"),
+  body: z.string().trim().min(10, "Campaign body is required"),
+})
+
 export const adminLoginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),
