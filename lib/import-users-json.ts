@@ -7,6 +7,7 @@ const DEFAULT_JSON_PATH = path.join(process.cwd(), "data", "import-users.json")
 const DEFAULT_CHECKPOINT_PATH = path.join(process.cwd(), "data", "import-users-checkpoint.json")
 const DEFAULT_BATCH_SIZE = 250
 const IMPORT_LOCK_ID = 903_110_144
+const CHECKPOINT_KEY = "import-users-json"
 
 export type ImportUserJsonRow = {
   email: string
@@ -83,7 +84,7 @@ export function readImportUsersJson(filePath = DEFAULT_JSON_PATH) {
   return parsed as ImportUserJsonRow[]
 }
 
-function readCheckpoint(checkpointPath = DEFAULT_CHECKPOINT_PATH, resetCheckpoint = false) {
+function readBundledCheckpoint(checkpointPath = DEFAULT_CHECKPOINT_PATH, resetCheckpoint = false) {
   if (resetCheckpoint || !fs.existsSync(checkpointPath)) {
     return { lastCompletedBatchIndex: -1 }
   }
@@ -99,18 +100,59 @@ function readCheckpoint(checkpointPath = DEFAULT_CHECKPOINT_PATH, resetCheckpoin
   }
 }
 
-function writeCheckpoint(batchIndex: number, checkpointPath = DEFAULT_CHECKPOINT_PATH) {
-  fs.writeFileSync(
-    checkpointPath,
-    `${JSON.stringify(
-      {
-        lastCompletedBatchIndex: batchIndex,
-        lastCompletedBatch: batchIndex + 1,
-        updatedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    )}\n`,
+async function ensureCheckpointTable() {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS import_checkpoints (
+      key text PRIMARY KEY,
+      last_completed_batch_index integer NOT NULL DEFAULT -1,
+      updated_at timestamp with time zone NOT NULL DEFAULT now()
+    )`,
+  )
+}
+
+async function readCheckpoint(checkpointPath = DEFAULT_CHECKPOINT_PATH, resetCheckpoint = false) {
+  await ensureCheckpointTable()
+
+  if (resetCheckpoint) {
+    await pool.query(
+      `INSERT INTO import_checkpoints (key, last_completed_batch_index)
+       VALUES ($1, -1)
+       ON CONFLICT (key) DO UPDATE
+       SET last_completed_batch_index = -1, updated_at = now()`,
+      [CHECKPOINT_KEY],
+    )
+    return { lastCompletedBatchIndex: -1 }
+  }
+
+  const existing = await pool.query<{ last_completed_batch_index: number }>(
+    `SELECT last_completed_batch_index
+     FROM import_checkpoints
+     WHERE key = $1`,
+    [CHECKPOINT_KEY],
+  )
+  if (existing.rows[0]) {
+    return { lastCompletedBatchIndex: existing.rows[0].last_completed_batch_index }
+  }
+
+  const bundledCheckpoint = readBundledCheckpoint(checkpointPath)
+  await pool.query(
+    `INSERT INTO import_checkpoints (key, last_completed_batch_index)
+     VALUES ($1, $2)
+     ON CONFLICT (key) DO NOTHING`,
+    [CHECKPOINT_KEY, bundledCheckpoint.lastCompletedBatchIndex],
+  )
+  return bundledCheckpoint
+}
+
+async function writeCheckpoint(batchIndex: number) {
+  await ensureCheckpointTable()
+  await pool.query(
+    `INSERT INTO import_checkpoints (key, last_completed_batch_index)
+     VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE
+     SET last_completed_batch_index = EXCLUDED.last_completed_batch_index,
+       updated_at = now()`,
+    [CHECKPOINT_KEY, batchIndex],
   )
 }
 
@@ -217,7 +259,7 @@ export async function importUsersFromJson({
   const normalized = normalizeRows(rawRows)
   const effectiveBatchSize = Math.max(1, batchSize)
   const batches = chunkArray(normalized.rows, effectiveBatchSize)
-  const checkpoint = readCheckpoint(checkpointPath, resetCheckpoint)
+  const checkpoint = await readCheckpoint(checkpointPath, resetCheckpoint)
   const startBatchIndex = checkpoint.lastCompletedBatchIndex + 1
   const result: ImportUsersJsonResult = {
     productSlug: PRODUCT_SLUG,
@@ -276,7 +318,7 @@ export async function importUsersFromJson({
       if (batchResult.error) {
         result.errors.push({ batch: batchIndex + 1, message: batchResult.error })
       } else {
-        writeCheckpoint(batchIndex, checkpointPath)
+        await writeCheckpoint(batchIndex)
         result.lastCompletedBatchIndex = batchIndex
       }
     }
