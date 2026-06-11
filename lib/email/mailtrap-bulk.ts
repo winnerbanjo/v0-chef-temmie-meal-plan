@@ -4,6 +4,7 @@ export type MailtrapBulkEmailArgs = {
   subject: string
   html: string
   unsubscribeUrl: string
+  deliveryReference: string
 }
 
 export class MailtrapBulkError extends Error {
@@ -19,9 +20,7 @@ export class MailtrapBulkError extends Error {
 }
 
 function getMailtrapApiUrl() {
-  // Mailtrap Bulk Stream endpoints can differ by account/dashboard setup.
-  // Keep this overrideable so production can point at the exact Bulk Stream URL.
-  return process.env.MAILTRAP_API_URL || "https://send.api.mailtrap.io/api/send"
+  return "https://bulk.api.mailtrap.io/api/send"
 }
 
 export async function sendMailtrapBulkEmail({
@@ -30,16 +29,17 @@ export async function sendMailtrapBulkEmail({
   subject,
   html,
   unsubscribeUrl,
+  deliveryReference,
 }: MailtrapBulkEmailArgs) {
-  const token = process.env.MAILTRAP_API_TOKEN
-  const fromEmail = process.env.MAILTRAP_FROM_EMAIL
-  const fromName = process.env.MAILTRAP_FROM_NAME || "Chef Temmie"
+  const token = process.env.MAILTRAP_BULK_TOKEN
+  const fromEmail = process.env.MAILTRAP_MARKETING_FROM_EMAIL || "updates@mt23.nile.ng"
+  const fromName = process.env.MAILTRAP_MARKETING_FROM_NAME || "Chef Temmie"
 
   if (!token) {
-    throw new MailtrapBulkError("MAILTRAP_API_TOKEN is not set.")
+    throw new MailtrapBulkError("MAILTRAP_BULK_TOKEN is not set.")
   }
   if (!fromEmail) {
-    throw new MailtrapBulkError("MAILTRAP_FROM_EMAIL is not set.")
+    throw new MailtrapBulkError("MAILTRAP_MARKETING_FROM_EMAIL is not set.")
   }
 
   const res = await fetch(getMailtrapApiUrl(), {
@@ -56,9 +56,11 @@ export async function sendMailtrapBulkEmail({
       category: "meal_plan",
       custom_variables: {
         campaign_type: "meal_plan",
+        delivery_reference: deliveryReference,
       },
       headers: {
         "List-Unsubscribe": `<${unsubscribeUrl}>`,
+        "X-Entity-Ref-ID": deliveryReference,
       },
     }),
   })

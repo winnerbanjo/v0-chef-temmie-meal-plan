@@ -64,6 +64,15 @@ export type EmailUsageSummary = {
 
 type Sender = (args: MailtrapBulkEmailArgs) => Promise<unknown>
 
+async function mockEmailCampaignSender({ to, subject, deliveryReference }: MailtrapBulkEmailArgs) {
+  console.log(`[email-campaign:mock-send] accepted to=${to} subject="${subject}" ref=${deliveryReference}`)
+  return { status: 202, mocked: true }
+}
+
+function getDefaultCampaignSender(): Sender {
+  return process.env.EMAIL_CAMPAIGN_MOCK_SENDS === "true" ? mockEmailCampaignSender : sendMailtrapBulkEmail
+}
+
 function envInt(name: string, fallback: number) {
   const parsed = Number(process.env[name])
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
@@ -432,6 +441,22 @@ async function pauseCampaign(client: Queryable, campaignId: number, reason: stri
   )
 }
 
+async function pauseCampaignForRecipient(client: Queryable, campaignId: number, recipientId: number, reason: string) {
+  await client.query(
+    `UPDATE email_campaign_recipients
+     SET status = 'pending', locked_at = NULL, last_error = $2
+     WHERE id = $1`,
+    [recipientId, reason],
+  )
+  await pauseCampaign(client, campaignId, reason)
+}
+
+function shouldPauseForProviderError(err: unknown, status?: number) {
+  if (!(err instanceof MailtrapBulkError)) return false
+  if (!status) return true
+  return [400, 401, 403, 422, 429].includes(status)
+}
+
 async function resetStaleSendingRows(client: Queryable) {
   const result = await client.query(
     `UPDATE email_campaign_recipients
@@ -473,7 +498,7 @@ async function lockNextRecipients(client: DbClient, campaignId: number, limit: n
 }
 
 export async function processEmailCampaignBatch({
-  sender = sendMailtrapBulkEmail,
+  sender = getDefaultCampaignSender(),
   batchSize,
   origin,
 }: {
@@ -567,6 +592,7 @@ export async function processEmailCampaignBatch({
           subject: campaign.subject,
           html: appendCampaignFooter(campaign.body, unsubscribeUrl),
           unsubscribeUrl,
+          deliveryReference: `nile-marketing-c${campaign.id}-r${recipient.id}`,
         })
         await markRecipientSent(client, recipient.id)
         await incrementUsageAfterAcceptedSend(client)
@@ -574,16 +600,14 @@ export async function processEmailCampaignBatch({
       } catch (err) {
         const status = err instanceof MailtrapBulkError ? err.status : undefined
         const message = err instanceof Error ? err.message : "Unknown email send error."
-        if (status === 429) {
-          await client.query(
-            `UPDATE email_campaign_recipients
-             SET status = 'pending', locked_at = NULL, last_error = $2
-             WHERE id = $1`,
-            [recipient.id, "Mailtrap rate limit hit. Campaign paused."],
-          )
-          await pauseCampaign(client, campaign.id, "Mailtrap rate limit hit. Campaign paused.")
+        if (shouldPauseForProviderError(err, status)) {
+          const reason =
+            status === 429
+              ? "Mailtrap rate limit hit. Campaign paused."
+              : `Mailtrap provider/configuration error. Campaign paused: ${message}`
+          await pauseCampaignForRecipient(client, campaign.id, recipient.id, reason.slice(0, 1000))
           summary.paused = true
-          summary.message = "Mailtrap rate limit hit. Campaign paused."
+          summary.message = reason
           break
         }
 

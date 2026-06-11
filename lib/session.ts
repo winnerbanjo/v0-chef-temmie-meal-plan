@@ -1,9 +1,14 @@
 import { SignJWT, jwtVerify } from "jose"
 import { cookies } from "next/headers"
 
-const secret = new TextEncoder().encode(
-  process.env.BETTER_AUTH_SECRET || process.env.SESSION_SECRET || "dev-insecure-secret-change-me-please-32",
-)
+function sessionSecret() {
+  const value = process.env.BETTER_AUTH_SECRET || process.env.SESSION_SECRET
+  if (value) return new TextEncoder().encode(value)
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("BETTER_AUTH_SECRET or SESSION_SECRET must be set in production.")
+  }
+  return new TextEncoder().encode("dev-insecure-secret-change-me-please-32")
+}
 
 export const ACCESS_COOKIE = "mealplan_access"
 export const ADMIN_COOKIE = "admin_session"
@@ -13,12 +18,12 @@ async function sign(payload: Record<string, unknown>, expires: string) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(expires)
-    .sign(secret)
+    .sign(sessionSecret())
 }
 
 async function verify<T>(token: string): Promise<T | null> {
   try {
-    const { payload } = await jwtVerify(token, secret)
+    const { payload } = await jwtVerify(token, sessionSecret())
     return payload as T
   } catch {
     return null
@@ -78,8 +83,13 @@ export async function clearAdminSession() {
 }
 
 export function checkAdminCredentials(email: string, password: string): boolean {
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@cheftemmie.com"
-  const adminPassword = process.env.ADMIN_PASSWORD || "admin1234"
-  console.log(adminEmail, adminPassword, email, password)
+  const adminEmail = process.env.ADMIN_EMAIL
+  const adminPassword = process.env.ADMIN_PASSWORD
+  if (!adminEmail || !adminPassword) {
+    if (process.env.NODE_ENV !== "production") {
+      return email.toLowerCase() === "admin@cheftemmie.com" && password === "admin1234"
+    }
+    return false
+  }
   return email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword
 }

@@ -2,123 +2,168 @@ import { config } from "dotenv"
 
 config({ path: ".env" })
 
+const TEST_SUBJECT = "Test Meal Plan Campaign"
+const TEST_CREATED_BY = "test-script"
+const TEST_ORIGIN = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+
 const MOCK_RECIPIENTS = [
-  { email: "mock-user-1@example.com", name: "Mock User One" },
-  { email: "mock-user-2@example.com", name: "Mock User Two" },
+  { email: "kuipid01@gmail.com", name: "Mock User One" },
+  { email: "kuipid02@gmail.com", name: "Mock User Two" },
+  { email: "kuipidtech@gmail.com", name: "Mock User Three" },
 ]
+
+process.env.CRON_SECRET ||= "dev-email-campaign-test-secret"
+process.env.EMAIL_BATCH_SIZE_PER_CRON = String(MOCK_RECIPIENTS.length)
+
+if (process.env.TEST_SEND_REAL_EMAILS !== "true") {
+  process.env.EMAIL_CAMPAIGN_MOCK_SENDS = "true"
+}
 
 async function main() {
   const { pool } = await import("../lib/db")
-  const { createEmailCampaign, processEmailCampaignBatch } = await import("../lib/email-campaigns")
-  const { sendMailtrapBulkEmail } = await import("../lib/email/mailtrap-bulk")
+  const { createEmailCampaign } = await import("../lib/email-campaigns")
+  const { GET: runEmailCampaignCron } = await import("../app/api/cron/send-email-campaigns/route")
 
   async function ensureMockSubscribers() {
-  for (const recipient of MOCK_RECIPIENTS) {
-    const user = await pool.query<{ id: number }>(
-      `INSERT INTO app_users (full_name, email)
-       VALUES ($1, $2)
-       ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = now()
-       RETURNING id`,
-      [recipient.name, recipient.email],
-    )
+    for (const recipient of MOCK_RECIPIENTS) {
+      const user = await pool.query<{ id: number }>(
+        `INSERT INTO app_users (full_name, email)
+         VALUES ($1, $2)
+         ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = now()
+         RETURNING id`,
+        [recipient.name, recipient.email],
+      )
 
-    await pool.query(
-      `INSERT INTO subscribers (user_id, email, source_platform, status)
-       VALUES ($1, $2, 'test', 'active')
-       ON CONFLICT (email) DO UPDATE
-       SET status = 'active', user_id = EXCLUDED.user_id, updated_at = now()`,
-      [user.rows[0].id, recipient.email],
-    )
+      await pool.query(
+        `INSERT INTO subscribers (user_id, email, source_platform, status)
+         VALUES ($1, $2, 'test', 'active')
+         ON CONFLICT (email) DO UPDATE
+         SET status = 'active', user_id = EXCLUDED.user_id, updated_at = now()`,
+        [user.rows[0].id, recipient.email],
+      )
 
-    await pool.query(`DELETE FROM email_suppressions WHERE lower(email) = lower($1)`, [recipient.email])
-  }
-  }
-
-  async function getCampaignCounts(campaignId: number) {
-  const result = await pool.query<{
-    id: number
-    recipient_count: number
-    sent_count: number
-    failed_count: number
-    skipped_count: number
-    status: string
-  }>(
-    `SELECT id, recipient_count, sent_count, failed_count, skipped_count, status
-     FROM email_campaigns
-     WHERE id = $1`,
-    [campaignId],
-  )
-  return result.rows[0]
+      await pool.query("DELETE FROM email_suppressions WHERE lower(email) = lower($1)", [recipient.email])
+    }
   }
 
   async function cancelPreviousTestCampaigns() {
     const previous = await pool.query<{ id: number }>(
       `UPDATE email_campaigns
        SET status = 'cancelled', completed_at = now()
-       WHERE subject = 'Test Meal Plan Campaign'
-         AND created_by = 'test-script'
+       WHERE subject = $1
+         AND created_by = $2
          AND status IN ('queued', 'sending', 'paused')
        RETURNING id`,
+      [TEST_SUBJECT, TEST_CREATED_BY],
     )
 
     for (const row of previous.rows) {
       await pool.query(
         `UPDATE email_campaign_recipients
-         SET status = 'skipped', locked_at = NULL, last_error = 'Previous test campaign cancelled before rerun.'
+         SET status = 'skipped',
+           locked_at = NULL,
+           last_error = 'Previous test campaign cancelled before rerun.'
          WHERE campaign_id = $1 AND status IN ('pending', 'sending')`,
         [row.id],
       )
     }
   }
 
+  async function getCampaign(campaignId: number) {
+    const result = await pool.query<{
+      id: number
+      recipient_count: number
+      sent_count: number
+      failed_count: number
+      skipped_count: number
+      status: string
+    }>(
+      `SELECT id, recipient_count, sent_count, failed_count, skipped_count, status
+       FROM email_campaigns
+       WHERE id = $1`,
+      [campaignId],
+    )
+    return result.rows[0]
+  }
+
+  async function getRecipients(campaignId: number) {
+    const result = await pool.query<{
+      email: string
+      status: string
+      attempts: number
+      last_error: string | null
+      sent_at: Date | null
+    }>(
+      `SELECT email, status, attempts, last_error, sent_at
+       FROM email_campaign_recipients
+       WHERE campaign_id = $1
+       ORDER BY email`,
+      [campaignId],
+    )
+    return result.rows
+  }
+
+  function makeCronRequest(secret?: string) {
+    return new Request(`${TEST_ORIGIN}/api/cron/send-email-campaigns`, {
+      method: "GET",
+      headers: secret ? { authorization: `Bearer ${secret}` } : undefined,
+    })
+  }
+
   await ensureMockSubscribers()
   await cancelPreviousTestCampaigns()
 
-  const useRealMailtrap = process.env.TEST_SEND_REAL_EMAILS === "true"
-  const sender = useRealMailtrap
-    ? sendMailtrapBulkEmail
-    : async ({ to, subject }: { to: string; subject: string; html: string; unsubscribeUrl: string }) => {
-        console.log(`[email-campaign:test-mock] accepted to=${to} subject="${subject}"`)
-        return { status: 202, mocked: true }
-      }
+  const unauthorized = await runEmailCampaignCron(makeCronRequest())
+  if (unauthorized.status !== 401) {
+    throw new Error(`Expected cron route without Authorization to return 401, got ${unauthorized.status}.`)
+  }
 
   const queued = await createEmailCampaign({
-    subject: "Test Meal Plan Campaign",
-    body: "<h1>Test Meal Plan</h1><p>This is a safe two-recipient campaign test.</p>",
-    createdBy: "test-script",
+    subject: TEST_SUBJECT,
+    body: `
+      <h1>Chef Temmie test campaign</h1>
+      <p>This is a mock dev-flow campaign generated by scripts/test-email-campaign.ts.</p>
+    `,
+    createdBy: TEST_CREATED_BY,
     recipientEmails: MOCK_RECIPIENTS.map((recipient) => recipient.email),
   })
 
-  const result = await processEmailCampaignBatch({
-    sender,
-    batchSize: 2,
-    origin: process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-  })
-  const campaign = await getCampaignCounts(queued.campaignId)
+  const authorized = await runEmailCampaignCron(makeCronRequest(process.env.CRON_SECRET))
+  const cronResult = await authorized.json()
+  if (!authorized.ok) {
+    throw new Error(`Authorized cron route failed with ${authorized.status}: ${JSON.stringify(cronResult)}`)
+  }
 
+  const campaign = await getCampaign(queued.campaignId)
   if (!campaign) {
-    throw new Error("Test campaign was not found after processing.")
+    throw new Error("Test campaign was not found after cron processing.")
   }
-  if (campaign.recipient_count !== 2) {
-    throw new Error(`Expected exactly 2 recipients, found ${campaign.recipient_count}.`)
+
+  const recipients = await getRecipients(queued.campaignId)
+  const expectedCount = MOCK_RECIPIENTS.length
+
+  if (campaign.recipient_count !== expectedCount) {
+    throw new Error(`Expected ${expectedCount} recipients, found ${campaign.recipient_count}.`)
   }
-  if (campaign.sent_count !== 2) {
-    throw new Error(`Expected both mock recipients to be sent, found sent_count=${campaign.sent_count}.`)
+  if (campaign.sent_count !== expectedCount) {
+    throw new Error(`Expected all recipients to be sent, found sent_count=${campaign.sent_count}.`)
+  }
+  if (campaign.failed_count || campaign.skipped_count) {
+    throw new Error(
+      `Expected no failures/skips, found failed=${campaign.failed_count}, skipped=${campaign.skipped_count}.`,
+    )
   }
   if (campaign.status !== "sent") {
     throw new Error(`Expected campaign to complete with status sent, found ${campaign.status}.`)
   }
 
-  console.log("Email campaign test result")
+  console.log("Email campaign route-flow test result")
   console.log({
-    campaignId: campaign.id,
-    recipientCount: campaign.recipient_count,
-    sentCount: campaign.sent_count,
-    failedCount: campaign.failed_count,
-    skippedCount: campaign.skipped_count,
-    status: campaign.status,
-    cronResult: result,
-    realMailtrapSend: useRealMailtrap,
+    campaign,
+    recipients,
+    cronResult,
+    mockSends: process.env.EMAIL_CAMPAIGN_MOCK_SENDS === "true",
+    realMailtrapSend: process.env.TEST_SEND_REAL_EMAILS === "true",
   })
 }
 
